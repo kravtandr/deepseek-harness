@@ -90,3 +90,14 @@ describe('desktop build version discovery', () => {
       .resolves.toBe(`${PRERELEASE}.${DATE}.3`)
   })
 })
+
+
+it('numbers Linux AppImage and deb files locally even when release settings are inherited', async () => {
+  const artifactsRoot = await artifactsWith([
+    `deepseek-harness-${PRERELEASE}.${DATE}.2-linux-x86_64-unsigned.AppImage`,
+    `deepseek-harness-${PRERELEASE}.${DATE}.4-linux-amd64-unsigned.deb`,
+  ])
+  await expect(suggestDesktopBuildVersion({
+    productVersion: PRERELEASE, target: 'linux-x64', environment: { DSH_DESKTOP_AUTO_UPDATE_ENV: 'invalid' }, date: DATE, artifactsRoot,
+  })).resolves.toBe(`${PRERELEASE}.${DATE}.5`)
+})

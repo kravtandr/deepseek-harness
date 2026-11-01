@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { readFileSync } from 'node:fs'
 import { Arch, Platform } from 'electron-builder'
 import { AppInfo, Packager } from 'app-builder-lib'
+import { validateConfiguration } from 'app-builder-lib/out/util/config/config.js'
 import { expandMacro } from 'app-builder-lib/out/util/macroExpander.js'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -124,4 +125,21 @@ describe('installer preparation preserves application dependencies', () => {
     const packaged = new Set(config.files.filter((entry): entry is string => typeof entry === 'string'))
     for (const name of referenced) expect(packaged.has(`lib/${name}`)).toBe(true)
   })
+})
+
+
+it('builds local Linux installers without an official update feed or policy', async () => {
+  const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+  const environment = { DSH_DESKTOP_APP_ID: 'com.example.local', DSH_DESKTOP_UNSIGNED: '1' }
+  const config = createElectronBuilderConfig(environment, 'linux', 'x64')
+  const linux = { ...config.linux, target: [...config.linux.target] }
+  const logger = new Packager({ projectDir: tmpdir() }).debugLogger
+  await expect(validateConfiguration({ linux }, logger)).resolves.toBeUndefined()
+  await expect(validateConfiguration({ linux: { ...linux, ...{ packageName: 'invalid-location' } } }, logger))
+    .rejects.toThrow(/Invalid configuration/u)
+  expect(config.publish).toBeNull()
+  expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+  expect(config.linux).toMatchObject({ target: ['AppImage', 'deb'], executableName: 'deepseek-harness' })
+  expect(() => createElectronBuilderConfig({ ...environment, DSH_DESKTOP_UNSIGNED: '0' }, 'linux', 'x64'))
+    .toThrow(/Linux packaging requires/u)
 })

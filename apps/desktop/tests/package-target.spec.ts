@@ -26,7 +26,7 @@ describe('desktop package target', () => {
   })
 
   it('rejects unsupported targets and hosts before building', () => {
-    expect(() => resolveDesktopPackageTarget('linux-x64', 'linux', 'x64')).toThrow(/unsupported target/u)
+    expect(() => resolveDesktopPackageTarget('linux-riscv64', 'linux', 'riscv64')).toThrow(/unsupported target/u)
     expect(() => resolveDesktopPackageTarget('win-x64', 'darwin', 'arm64')).toThrow(/Windows x64/u)
     expect(() => resolveDesktopPackageTarget('mac-arm64', 'darwin', 'x64')).toThrow(/Apple Silicon/u)
     expect(() => resolveDesktopPackageTarget('mac-arm64', 'linux', 'arm64')).toThrow(/macOS/u)
@@ -156,4 +156,16 @@ it('allows skipping notarization only for signed macOS packages', () => {
     expect(() => parseDesktopPackageInvocation(['mac-arm64', '--skip-notarization', flag], 'darwin', 'arm64')).toThrow(/requires a signed macOS build/u)
   }
   expect(() => parseDesktopPackageInvocation(['win-x64', '--skip-notarization'], 'win32', 'x64')).toThrow(/requires a signed macOS build/u)
+})
+
+
+it.each(['x64', 'arm64'] as const)('builds local Linux %s artifacts only on a matching host', (arch) => {
+  const name = `linux-${arch}`
+  const invocation = parseDesktopPackageInvocation([name, '--unsigned', '--dir'], 'linux', arch)
+  expect(invocation).toMatchObject({ unsigned: true, directory: true, target: { platform: 'linux', arch } })
+  expect(desktopElectronBuilderArguments(invocation.target, true)).toContain('--linux')
+  expect(() => resolveDesktopPackageTarget(name, 'darwin', arch)).toThrow(/Linux/u)
+  expect(() => resolveDesktopPackageTarget(name, 'linux', arch === 'x64' ? 'arm64' : 'x64')).toThrow(/Linux/u)
+  expect(() => parseDesktopPackageInvocation([name], 'linux', arch)).toThrow(/requires --unsigned/u)
+  expect(() => parseDesktopPackageInvocation([name, '--skip-notarization'], 'linux', arch)).toThrow(/signed macOS/u)
 })
